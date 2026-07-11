@@ -24,7 +24,7 @@ Select files in Obsidian and press `Cmd + C` (macOS) or `Ctrl + C` (Win). You ca
 Files and entire folders are both supported.
 
 ### 📥 Paste External Files into Obsidian
-Copy files or folders in Finder, File Explorer, or a Linux file manager. Then right-click an Obsidian folder and choose **Natural move: paste external files here**. Name conflicts are resolved automatically without overwriting existing files.
+Copy files or folders in Finder, File Explorer, or a Linux file manager. Then select an Obsidian folder and press `Cmd + V` (macOS) or `Ctrl + V` (Windows/Linux), or right-click the folder and choose **Natural move: paste external files here**. Name conflicts are resolved automatically without overwriting existing files.
 
 ### 🖱️ Direct Drag & Drop
 Hold the `Alt` key and drag files or folders from Obsidian directly into other apps (e.g., Mail, Slack, or a folder).

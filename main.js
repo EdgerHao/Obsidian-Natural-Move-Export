@@ -664,17 +664,29 @@ var NaturalMove = class extends import_obsidian.Plugin {
     await this.loadSettings();
     this.initAudio();
     this.boundKeyDownHandler = (evt) => {
-      if ((evt.metaKey || evt.ctrlKey) && (evt.key.toLowerCase() === "c" || evt.code === "KeyC")) {
-        const target = evt.target;
-        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable || target.closest(".cm-editor, .markdown-source-view, .markdown-rendered")) {
-          return;
-        }
+      if (!(evt.metaKey || evt.ctrlKey) || evt.altKey) return;
+      const isCopyShortcut = evt.key.toLowerCase() === "c" || evt.code === "KeyC";
+      const isPasteShortcut = !evt.shiftKey && (evt.key.toLowerCase() === "v" || evt.code === "KeyV");
+      if (!isCopyShortcut && !isPasteShortcut) return;
+      const target = evt.target instanceof HTMLElement ? evt.target : null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable || target.closest(".cm-editor, .markdown-source-view, .markdown-rendered"))) {
+        return;
+      }
+      if (isCopyShortcut) {
         const files = this.getSelectedFiles();
         if (files.length > 0) {
           evt.preventDefault();
           evt.stopPropagation();
           void this.copyFilesToClipboard(files);
         }
+        return;
+      }
+      if (evt.repeat) return;
+      const targetFolder = this.getSelectedFolderForPaste(target);
+      if (targetFolder) {
+        evt.preventDefault();
+        evt.stopImmediatePropagation();
+        void this.pasteExternalFiles(targetFolder);
       }
     };
     document.addEventListener("keydown", this.boundKeyDownHandler, true);
@@ -909,6 +921,16 @@ var NaturalMove = class extends import_obsidian.Plugin {
       }
     });
     return files;
+  }
+  getSelectedFolderForPaste(target) {
+    const folderElement = target?.closest(".nav-folder-title, .nav-folder");
+    const focusedFolderPath = folderElement?.getAttribute("data-path") ?? folderElement?.querySelector(".nav-folder-title[data-path]")?.getAttribute("data-path");
+    if (focusedFolderPath !== null && focusedFolderPath !== void 0) {
+      const focusedFolder = this.app.vault.getAbstractFileByPath(focusedFolderPath);
+      if (focusedFolder instanceof import_obsidian.TFolder) return focusedFolder;
+    }
+    const selectedFolders = this.getSelectedFiles().filter((file) => file instanceof import_obsidian.TFolder);
+    return selectedFolders.length === 1 ? selectedFolders[0] : null;
   }
   copyFilesToClipboard(files) {
     const absolutePaths = files.map((f) => this.getAbsolutePath(f)).filter((p) => p !== null);

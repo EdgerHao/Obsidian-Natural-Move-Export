@@ -66,27 +66,41 @@ export default class NaturalMove extends Plugin {
 		// Audio Context initialisieren
 		this.initAudio();
 
-		// 1. Globaler Copy-Handler für Cmd+C / Ctrl+C (via keydown)
+		// 1. Global copy/paste handler for file explorer selections.
 		this.boundKeyDownHandler = (evt: KeyboardEvent) => {
-			if ((evt.metaKey || evt.ctrlKey) && (evt.key.toLowerCase() === 'c' || evt.code === 'KeyC')) {
-				const target = evt.target as HTMLElement;
-				
-				// Wenn der Fokus im Editor oder einem Eingabefeld liegt, IMMER das Standard-Copy von Obsidian/System zulassen
-				if (
-					target.tagName === 'INPUT' || 
-					target.tagName === 'TEXTAREA' || 
-					target.isContentEditable || 
-					target.closest('.cm-editor, .markdown-source-view, .markdown-rendered')
-				) {
-					return;
-				}
+			if (!(evt.metaKey || evt.ctrlKey) || evt.altKey) return;
 
+			const isCopyShortcut = evt.key.toLowerCase() === 'c' || evt.code === 'KeyC';
+			const isPasteShortcut = !evt.shiftKey && (evt.key.toLowerCase() === 'v' || evt.code === 'KeyV');
+			if (!isCopyShortcut && !isPasteShortcut) return;
+
+			const target = evt.target instanceof HTMLElement ? evt.target : null;
+			// Always preserve native clipboard behavior inside editors and form controls.
+			if (target && (
+				target.tagName === 'INPUT' ||
+				target.tagName === 'TEXTAREA' ||
+				target.isContentEditable ||
+				target.closest('.cm-editor, .markdown-source-view, .markdown-rendered')
+			)) {
+				return;
+			}
+
+			if (isCopyShortcut) {
 				const files = this.getSelectedFiles();
 				if (files.length > 0) {
 					evt.preventDefault();
 					evt.stopPropagation();
 					void this.copyFilesToClipboard(files);
 				}
+				return;
+			}
+
+			if (evt.repeat) return;
+			const targetFolder = this.getSelectedFolderForPaste(target);
+			if (targetFolder) {
+				evt.preventDefault();
+				evt.stopImmediatePropagation();
+				void this.pasteExternalFiles(targetFolder);
 			}
 		};
 		document.addEventListener('keydown', this.boundKeyDownHandler, true);
@@ -420,6 +434,22 @@ export default class NaturalMove extends Plugin {
 			}
 		});
 		return files;
+	}
+
+	private getSelectedFolderForPaste(target: HTMLElement | null): TFolder | null {
+		// Prefer the folder that currently owns keyboard focus, when available.
+		const folderElement = target?.closest('.nav-folder-title, .nav-folder');
+		const focusedFolderPath = folderElement?.getAttribute('data-path')
+			?? folderElement?.querySelector('.nav-folder-title[data-path]')?.getAttribute('data-path');
+
+		if (focusedFolderPath !== null && focusedFolderPath !== undefined) {
+			const focusedFolder = this.app.vault.getAbstractFileByPath(focusedFolderPath);
+			if (focusedFolder instanceof TFolder) return focusedFolder;
+		}
+
+		// Ignore active editor files and accept the shortcut only when exactly one folder is selected.
+		const selectedFolders = this.getSelectedFiles().filter((file): file is TFolder => file instanceof TFolder);
+		return selectedFolders.length === 1 ? selectedFolders[0] : null;
 	}
 
 	private copyFilesToClipboard(files: TAbstractFile[]) {
